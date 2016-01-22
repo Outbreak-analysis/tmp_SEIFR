@@ -148,15 +148,15 @@ trans.rate.SEIFR <- function(x, prm, t){
 			 trans.F))
 }
 
-SEIFR.sim <-function(beta_IS, # contact rate
-					 beta_FS,
+SEIFR.sim <-function(beta_IS, # contact rate I -> S
+					 beta_FS, # contact rate F -> S
 					 DOL.days,  # avg duration of latency
 					 DOI.days,  # avg duration of infectiousness
 					 funeral.days, # avg duration of funerals
 					 horizon,  # horizon of the simulation
 					 n.MC,   # Monte carlo iterations
 					 delta , # proportion infected that will die
-					 pop.size, 
+					 pop.size, # effective population size
 					 I.init,  # initial number of infectious individuals
 					 nE,   # number of (artificial) compartments for E
 					 nI,   # number of (artificial) compartments for I
@@ -164,7 +164,7 @@ SEIFR.sim <-function(beta_IS, # contact rate
 					 chgcontact = NULL,  # temporal change in the contact rates (intervention,behaviour,...)
 					 t.chgcontact = NULL,  # time when the change starts
 					 seed = 1234,
-					 do.adaptivetau = TRUE,
+					 do.adaptivetau = TRUE, # FALSE = true Gillespie algo ; TRUE=approximation
 					 epsilon = 0.05, # larger=faster but less accurate
 					 time.bucket = 1,  # aggregation of incidence in time units (Gillespie events happens any time)
 					 remove.fizzles = FALSE  # remove Monte carlo iterations that are fizzles
@@ -196,8 +196,8 @@ SEIFR.sim <-function(beta_IS, # contact rate
 			I0,
 			rep(0,nI-1),
 			rep(0,nF), 
-			0, # <-- R
-			0  # <-- B
+			0, # <-- R (removed: alive & immune after infection)
+			0  # <-- B (buried: dead after infection)
 			)
 	names(x0) <- c("S",
 				   paste0("E",1:nE),
@@ -267,7 +267,7 @@ SEIFR.sim <-function(beta_IS, # contact rate
 		all.sim.nofizz <- all.sim[all.sim$mc %in% mc.nofizz,]
 		all.sim <- all.sim.nofizz
 	}
-	### Incidence only at time buckets
+	### Incidence only at time buckets ('tb')
 	inc.tb <- ddply(all.sim,c("tb","mc"),summarize,
 					inc = sum(inc),
 					cuminc = max(cuminc),

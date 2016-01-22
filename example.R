@@ -1,18 +1,25 @@
-source("seifr_gillespie_FCT.R")
+#### 
+####  Example file to show how to 
+####  call the SEIFR model
+####
+####  Time unit can be anything, but must be consistent!
+####
 
-do.adaptivetau <- TRUE
+source("seifr_gillespie.R")
+
+do.adaptivetau <- TRUE   # FALSE=true Gillespie ; TRUE=approximation of Gillespies algo
 epsilon <- 0.06 # default<-0.05 ; larger=faster but less accurate
 
 n.MC <- 5   # Monte carlo iterations
-horizon <- 180
+horizon <- 180  
 
 # Epidemiological parameters
-DOL.days <- 5
-DOI.days <- 6
-funeral.days <- 1
-delta <- 0.65
+DOL.days <- 5   # Mean duration of latency
+DOI.days <- 6   # Mean duration of infectiousness
+funeral.days <- 1 # Mean duration of funerals
+delta <- 0.65  # Death rate following infection
 
-R0 <- 2.5
+R0 <- 2.5   # Not the correct R0, but shouldn't be far
 beta_IS <- R0/(1/DOI.days+1/funeral.days)/2 # <-- quick and dirty (and not correct!)
 beta_FS <- 1*beta_IS
 
@@ -20,13 +27,15 @@ beta_FS <- 1*beta_IS
 # convergence stochastic -> deterministic
 pop.size <- 1E3
 
-# Artificial compartments:
+# Number of artificial compartments 
+# to mimic a gamma distribution
+# (the higher 'nX', the narrower the distribution)
 nE <- 3
 nI <- 4
 nF <- 2
 
-sim <- SEIFR.sim(beta_IS, # contact rate
-				 beta_FS,
+sim <- SEIFR.sim(beta_IS, # contact rate I -> S
+				 beta_FS, # contact rate F -> S
 				 DOL.days,  # avg duration of latency
 				 DOI.days,  # avg duration of infectiousness
 				 funeral.days, # avg duration of funerals
@@ -37,30 +46,22 @@ sim <- SEIFR.sim(beta_IS, # contact rate
 				 I.init=1,  # initial number of infectious individuals
 				 nE,   # number of (artificial) compartments for E
 				 nI,   # number of (artificial) compartments for I
-				 nF
-				 # 							,   # number of (artificial) compartments for F
-				 # 							chgcontact = NULL,  # temporal change in the contact rates (intervention,behaviour,...)
-				 # 							t.chgcontact = NULL,  # time when the change starts
-				 # 							seed = 1234,
-				 # 							do.adaptivetau = TRUE,
-				 # 							epsilon = 0.05, # larger=faster but less accurate
-				 # 							time.bucket = 1,  # aggregation of incidence in time units (Gillespie events happens any time)
-				 # 							remove.fizzles = FALSE  # remove Monte carlo iterations that are fizzles
+				 nF,   # number of (artificial) compartments for F
+				 chgcontact = NULL,  # temporal change in the contact rates (intervention,behaviour,...)
+				 t.chgcontact = NULL,  # time when the change starts
+				 seed = 1234,
+				 do.adaptivetau = do.adaptivetau,
+				 epsilon = epsilon, # larger=faster but less accurate
+				 time.bucket = 1,  # aggregation of incidence in time units (Gillespie events happens any time)
+				 remove.fizzles = FALSE  # remove Monte carlo iterations that are fizzles
 )
 
 
+### Plots just one Monte Carlo iteration
 
-### Plots:
+mc.chosen <- n.MC  # Choose any one
 
-# g <- ggplot(all.sim)+geom_line(aes(x=t,y=prev,colour=factor(mc)))
-# plot(g)
-
-# g <- ggplot(subset(sim,mc<=5))+geom_step(aes(x=tb,y=cuminc,colour=factor(mc)),size=3)
-
-g <- ggplot(subset(sim,mc==5))+geom_step(aes(x=tb,y=inc),size=3)
-g <- g + geom_step(aes(x=tb,y=buried),size=3)
+g <- ggplot(subset(sim,mc==mc.chosen))+geom_step(aes(x=tb,y=inc),size=2)
+g <- g + geom_step(aes(x=tb,y=buried),size=2,colour="red")
 plot(g)
 
-z <- subset(sim,mc==5)
-plot(z$tb,z$inc,type="l",col="red")
-lines(z$tb,z$buried)
