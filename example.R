@@ -23,6 +23,9 @@ R0 <- 2.5   # Not the correct R0, but shouldn't be far
 beta_IS <- R0/(1/DOI.days+1/funeral.days)/2 # <-- quick and dirty (and not correct!)
 beta_FS <- 1*beta_IS
 
+print(paste0("beta_IS=",beta_IS))
+print(paste0("beta_FS=",beta_FS))
+
 # Population size needs to be very large for 
 # convergence stochastic -> deterministic
 pop.size <- 1E3
@@ -34,21 +37,25 @@ nE <- 3
 nI <- 4
 nF <- 2
 
-sim <- SEIFR.sim(beta_IS, # contact rate I -> S
-				 beta_FS, # contact rate F -> S
-				 DOL.days,  # avg duration of latency
-				 DOI.days,  # avg duration of infectiousness
-				 funeral.days, # avg duration of funerals
+model.prm <- list(beta_IS=beta_IS, # contact rate I -> S
+				  beta_FS=beta_FS, # contact rate F -> S
+				  DOL.days=DOL.days,  # avg duration of latency
+				  DOI.days=DOI.days,  # avg duration of infectiousness
+				  funeral.days=funeral.days, # avg duration of funerals
+				  delta=delta , # proportion infected that will die
+				  pop.size=pop.size, 
+				  I.init=1,  # initial number of infectious individuals
+				  nE=nE,   # number of (artificial) compartments for E
+				  nI=nI,   # number of (artificial) compartments for I
+				  nF=nF,   # number of (artificial) compartments for F
+				  chgcontact = NULL,  # temporal change in the contact rates (intervention,behaviour,...)
+				  t.chgcontact = NULL  # time when the change starts
+)
+
+
+sim <- SEIFR.sim(model.prm,
 				 horizon,  # horizon of the simulation
 				 n.MC,   # Monte carlo iterations
-				 delta , # proportion infected that will die
-				 pop.size, 
-				 I.init=1,  # initial number of infectious individuals
-				 nE,   # number of (artificial) compartments for E
-				 nI,   # number of (artificial) compartments for I
-				 nF,   # number of (artificial) compartments for F
-				 chgcontact = NULL,  # temporal change in the contact rates (intervention,behaviour,...)
-				 t.chgcontact = NULL,  # time when the change starts
 				 seed = 1234,
 				 do.adaptivetau = do.adaptivetau,
 				 epsilon = epsilon, # larger=faster but less accurate
@@ -65,7 +72,6 @@ report.inc.lag.var <- 0.05
 report.bur.prob <- 0.8 
 report.bur.lag.mean <- 3
 report.bur.lag.var <- 0.02
-seed  <-  1234
 
 sim2 <- reporting.filter(sim,
 						 report.inc.prob, 
@@ -73,16 +79,78 @@ sim2 <- reporting.filter(sim,
 						 report.inc.lag.var, 
 						 report.bur.prob, 
 						 report.bur.lag.mean,
-						 report.bur.lag.var,
-						 seed)
+						 report.bur.lag.var)
 
 
 
 ### Plots just one Monte Carlo iteration
 
-mc.chosen <- n.MC  # Choose any one
+mc.chosen <- 1  # Choose any one
 
 g <- ggplot(subset(sim2,mc==mc.chosen))+geom_step(aes(x=tb,y=inc),size=2)
 g <- g + geom_step(aes(x=tb,y=buried),size=2,colour="red")
 plot(g)
 
+###
+###    FAKE CALIBRATION WITH 'ABC'
+###
+
+# We pretend that a simulation data set
+# is an actual observation:
+hz <- 23
+obs.data <- subset(sim,mc==1 & tb<=hz)
+
+plot(obs.data$tb, obs.data$inc, typ="s",lwd=3)
+lines(obs.data$tb, obs.data$bur, typ="s",col="red",lwd=3)
+
+# Specify which parameters will be calibrated:
+prm.fit <- list(beta_IS=0.999, beta_FS=0.999)
+priors <-  list(c("unif",0.001,2),
+				c("unif",0.001,2))
+
+# Fixed parameters (will NOT be calibrated):
+prm.fixed  <- list(DOL.days=DOL.days,  # avg duration of latency
+				   DOI.days=DOI.days,  # avg duration of infectiousness
+				   funeral.days=funeral.days, # avg duration of funerals
+				   delta=delta , # proportion infected that will die
+				   pop.size=pop.size, 
+				   I.init = 1,  # initial number of infectious individuals
+				   nE=nE,   # number of (artificial) compartments for E
+				   nI=nI,   # number of (artificial) compartments for I
+				   nF=nF,   # number of (artificial) compartments for F
+				   chgcontact = NULL,  # temporal change in the contact rates (intervention,behaviour,...)
+				   t.chgcontact = NULL  # time when the change starts
+)
+
+horizon <- hz+20  
+n.ABC <- 100
+tol.ABC <- 0.12
+
+# Summary statistics definition
+prm.stats <- list(first.time = 6, 
+				  last.time = hz)
+
+stat.type <- list(inc.poisson.reg=TRUE,
+				  bur.poisson.reg=TRUE,
+				  inc.max = TRUE,
+				  bur.max = FALSE)
+
+# Calibration with ABC:
+post.abc <- fit.abc(prm.fit, 
+					prm.fixed, 
+					obs.data,
+					prm.stats,
+					stat.type,
+					priors,
+					horizon,  
+					n.ABC,
+					tol.ABC)
+
+# Visualize posteriors:
+par(mfrow=c(1,3))
+plot(post.abc$param[,1],post.abc$param[,2])
+points(beta_IS, beta_FS,col="red",cex=5,pch=16)
+plot(density(post.abc$param[,1]))
+abline(v=beta_IS,col="red")
+plot(density(post.abc$param[,2]))
+abline(v=beta_FS,col="red")

@@ -148,32 +148,40 @@ trans.rate.SEIFR <- function(x, prm, t){
 			 trans.F))
 }
 
-SEIFR.sim <-function(beta_IS, # contact rate I -> S
-					 beta_FS, # contact rate F -> S
-					 DOL.days,  # avg duration of latency
-					 DOI.days,  # avg duration of infectiousness
-					 funeral.days, # avg duration of funerals
+SEIFR.sim <-function(model.prm, # List of all model parameters
 					 horizon,  # horizon of the simulation
 					 n.MC,   # Monte carlo iterations
-					 delta , # proportion infected that will die
-					 pop.size, # effective population size
-					 I.init,  # initial number of infectious individuals
-					 nE,   # number of (artificial) compartments for E
-					 nI,   # number of (artificial) compartments for I
-					 nF,   # number of (artificial) compartments for F
-					 chgcontact = NULL,  # temporal change in the contact rates (intervention,behaviour,...)
-					 t.chgcontact = NULL,  # time when the change starts
-					 seed = 1234,
+					 seed = NULL,
 					 do.adaptivetau = TRUE, # FALSE = true Gillespie algo ; TRUE=approximation
 					 epsilon = 0.05, # larger=faster but less accurate
 					 time.bucket = 1,  # aggregation of incidence in time units (Gillespie events happens any time)
-					 remove.fizzles = FALSE  # remove Monte carlo iterations that are fizzles
+					 remove.fizzles = FALSE,  # remove Monte carlo iterations that are fizzles,
+					 display.MC.count = FALSE
 ){
 	###
 	### RUN SEIFR SIMULATIONS
 	###
 	
-	set.seed(seed)
+	if (!is.null(seed)) set.seed(seed)
+	
+	# Unpack parameters:
+	beta_IS <- model.prm[["beta_IS"]] # contact rate I -> S
+	beta_FS<- model.prm[["beta_FS"]] # contact rate F -> S
+	DOL.days<- model.prm[["DOL.days"]]  # avg duration of latency
+	DOI.days<- model.prm[["DOI.days"]]  # avg duration of infectiousness
+	funeral.days<- model.prm[["funeral.days"]] # avg duration of funerals
+	delta <- model.prm[["delta"]] # proportion infected that will die
+	pop.size<- model.prm[["pop.size"]] # effective population size
+	I.init<- model.prm[["I.init"]]  # initial number of infectious individuals
+	nE<- model.prm[["nE"]]   # number of (artificial) compartments for E
+	nI<- model.prm[["nI"]]   # number of (artificial) compartments for I
+	nF<- model.prm[["nF"]]   # number of (artificial) compartments for F
+	chgcontact <- model.prm[["chgcontact"]]  # temporal change in the contact rates (intervention,behaviour,...)
+	t.chgcontact <- model.prm[["t.chgcontact"]]  # time when the change starts
+	
+	if(F){print("DEBUG - model param:")
+	print(model.prm)
+	}
 	
 	gamma <- 1/DOL.days
 	sigma <- 1/DOI.days
@@ -208,7 +216,8 @@ SEIFR.sim <-function(beta_IS, # contact rate I -> S
 	# Monte Carlo iterations:
 	
 	for(mc in 1:n.MC){
-		print(paste("MC",mc,"/",n.MC))
+		
+		if (display.MC.count) print(paste("MC",mc,"/",n.MC))
 		
 		if (!do.adaptivetau){
 			res <- ssa.exact(init.values = x0,
@@ -369,6 +378,3 @@ reporting.filter <- function(sim,
 	}
 	return(sim2)
 }
-
-
-
