@@ -6,6 +6,7 @@
 ####
 
 source("seifr_gillespie.R")
+source("fit_abc.R")
 
 do.adaptivetau <- TRUE   # FALSE=true Gillespie ; TRUE=approximation of Gillespies algo
 epsilon <- 0.06 # default<-0.05 ; larger=faster but less accurate
@@ -91,6 +92,7 @@ g <- ggplot(subset(sim2,mc==mc.chosen))+geom_step(aes(x=tb,y=inc),size=2)
 g <- g + geom_step(aes(x=tb,y=buried),size=2,colour="red")
 plot(g)
 
+
 ###
 ###    FAKE CALIBRATION WITH 'ABC'
 ###
@@ -123,8 +125,8 @@ prm.fixed  <- list(DOL.days=DOL.days,  # avg duration of latency
 )
 
 horizon <- hz+20  
-n.ABC <- 100
-tol.ABC <- 0.12
+n.ABC <- 30
+tol.ABC <- 0.2
 
 # Summary statistics definition
 prm.stats <- list(first.time = 6, 
@@ -144,7 +146,9 @@ post.abc <- fit.abc(prm.fit,
 					priors,
 					horizon,  
 					n.ABC,
-					tol.ABC)
+					tol.ABC,
+					multi.core = FALSE # <-- TRUE does not work!
+					)
 
 # Visualize posteriors:
 par(mfrow=c(1,3))

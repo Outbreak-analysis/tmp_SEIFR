@@ -3,6 +3,7 @@
 ###
 
 library(EasyABC)
+library(parallel)
 
 source("seifr_gillespie.R")
 
@@ -58,6 +59,23 @@ abc.stats <- function(sim,
 }
 
 
+get.clustername <- function(){
+	res <- NA
+	objlist <- ls(envir=.GlobalEnv)
+	# print(objlist)
+	for(i in 1:length(objlist)){
+		tmp <- get(objlist[i])
+		print(class(tmp))
+		if(any(grepl("cluster",class(tmp)))) {
+			res <- objlist[i]
+			break
+		}
+	}
+	return(res)
+}
+
+
+
 fit.abc <- function(prm.fit, 
 					prm.fixed, 
 					obs.data,
@@ -66,7 +84,8 @@ fit.abc <- function(prm.fit,
 					priors,
 					horizon,  
 					n.ABC,
-					tol.ABC
+					tol.ABC,
+					multi.core = FALSE
 ){
 	# Summary stats of observed data:
 	sum.stat.obs <- abc.stats(sim = obs.data,
@@ -74,7 +93,26 @@ fit.abc <- function(prm.fit,
 							  stat.type = stat.type)
 	
 	prm.fit.vec <- rapply(prm.fit, c)
-	str(prm.fit.vec)
+	
+	# --- DEBUG
+	
+	if(F) {
+		prm.fixed <<- prm.fixed
+		SEIFR.sim <<- SEIFR.sim
+		abc.stats <<- abc.stats
+	}
+	
+	if (F){  # multi.core
+		cn <- get.clustername()
+		if(!is.na(cn)) {
+			mycl <- get(cn)
+			
+			parallel::clusterExport(cl=mycl, 	
+									varlist = list("prm.fixed"),
+									envir=.GlobalEnv) #environment())
+		}
+	}
+	# --- DEBUG
 	
 	wrap.abc <- function(x=prm.fit.vec){
 		# Merge all model parameters:
@@ -93,7 +131,12 @@ fit.abc <- function(prm.fit,
 	}
 	
 	# Use of 'EasyABC' package:
+	nc <- 1
+	if (multi.core) nc <- 2  # temporary code
+	
 	posterior <- ABC_rejection(model = wrap.abc, 
+							   use_seed = multi.core,
+							   n_cluster = nc,
 							   prior = priors, 
 							   nb_simul = n.ABC,
 							   summary_stat_target = sum.stat.obs,
