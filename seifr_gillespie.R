@@ -126,7 +126,7 @@ trans.rate.SEIFR <- function(x, prm, t){
 	
 	# Recovery (I_nI)
 	recov.rate <- (1-delta)*gam*nI*x[paste0("I",nI)]*(x[paste0("I",nI)]>=1)
-
+	
 	# Death (I_nI)
 	death.rate <- delta*gam*nI*x[paste0("I",nI)]*(x[paste0("I",nI)]>=1)
 	
@@ -168,7 +168,7 @@ SEIFR.sim <-function(beta_IS, # contact rate I -> S
 					 epsilon = 0.05, # larger=faster but less accurate
 					 time.bucket = 1,  # aggregation of incidence in time units (Gillespie events happens any time)
 					 remove.fizzles = FALSE  # remove Monte carlo iterations that are fizzles
-					 ){
+){
 	###
 	### RUN SEIFR SIMULATIONS
 	###
@@ -198,7 +198,7 @@ SEIFR.sim <-function(beta_IS, # contact rate I -> S
 			rep(0,nF), 
 			0, # <-- R (removed: alive & immune after infection)
 			0  # <-- B (buried: dead after infection)
-			)
+	)
 	names(x0) <- c("S",
 				   paste0("E",1:nE),
 				   paste0("I",1:nI),
@@ -212,18 +212,18 @@ SEIFR.sim <-function(beta_IS, # contact rate I -> S
 		
 		if (!do.adaptivetau){
 			res <- ssa.exact(init.values = x0,
-								  transitions = trans.SEIFR(nE,nI,nF), 
-								  rateFunc = trans.rate.SEIFR, 
-								  params = params,
-								  tf=horizon)
+							 transitions = trans.SEIFR(nE,nI,nF), 
+							 rateFunc = trans.rate.SEIFR, 
+							 params = params,
+							 tf=horizon)
 		}
 		if(do.adaptivetau){
 			res <- ssa.adaptivetau(init.values = x0,
-										transitions = trans.SEIFR(nE,nI,nF), 
-										rateFunc = trans.rate.SEIFR, 
-										params = params,
-										tl.params = list(epsilon=epsilon),  
-										tf=horizon)
+								   transitions = trans.SEIFR(nE,nI,nF), 
+								   rateFunc = trans.rate.SEIFR, 
+								   params = params,
+								   tl.params = list(epsilon=epsilon),  
+								   tf=horizon)
 		}
 		
 		idx.E <- grepl("E",colnames(res))
@@ -276,3 +276,99 @@ SEIFR.sim <-function(beta_IS, # contact rate I -> S
 	
 	return(inc.tb)
 }
+
+
+lag.fct <- function(x,lag.mean,lag.var, seed=1234){
+	
+	set.seed(seed)
+	
+	x.lag <- rep(0,times=2*length(x))
+	x.lag[1:length(x)] <- x
+	
+	for(t in 1:length(x)){
+		
+# 		print(paste("time",t))
+# 		print(length(x.lag))
+		
+		
+		if(x[t]>0){
+			# If incidence positive, calculate lags for each case at that date:
+			lag <- round(rlnorm(n = x[t],
+								meanlog = log(lag.mean),
+								sdlog = lag.var), 
+						 digits = 0)
+			# print(lag) # DEBug
+			for(k in 1:length(lag)){
+				# Apply the lag for each case
+				if(lag[k]>0){
+					# Move incidence, one by one, to lagged reporting date
+					x.lag[t] <- x.lag[t]-1
+					x.lag[t+lag[k]] <- x.lag[t+lag[k]] + 1
+				}
+			}
+		}
+	}
+	return(x.lag)
+}
+
+
+reporting.filter <- function(sim,
+							 report.inc.prob, 
+							 report.inc.lag.mean, 
+							 report.inc.lag.var, 
+							 report.bur.prob, 
+							 report.bur.lag.mean,
+							 report.bur.lag.var,
+							 seed = 1234,
+							 do.plot = FALSE){
+	###
+	### Add a reporting "layer" to the simulated epidemic
+	###
+	
+	set.seed(seed)
+	n.mc <- max(sim$mc)
+	
+	for(m in 1:n.mc) {
+		tmp <- subset(sim,mc==m)
+		inc <- tmp$inc
+		bur <- tmp$buried
+		
+		# Reduce actual numbers to reported ones
+		inc.rep <- rbinom(n = length(inc),size = inc, prob = report.inc.prob)
+		bur.rep <- rbinom(n = length(bur),size = bur, prob = report.bur.prob)
+		
+		# Introduce lag
+		inc.rep.lag <- lag.fct(x = inc.rep, 
+							   lag.mean = report.inc.lag.mean, 
+							   lag.var = report.inc.lag.var)
+		bur.rep.lag <- lag.fct(x = bur.rep, 
+							   lag.mean = report.bur.lag.mean, 
+							   lag.var = report.bur.lag.var)
+		
+		# Format data frame same as input 'sim'
+		sim.tmp <- data.frame(tb=1:length(inc.rep.lag), 
+							  inc=inc.rep.lag, 
+							  buried=bur.rep.lag)
+		sim.tmp$mc <- m
+		sim.tmp$cuminc <- cumsum(sim.tmp$inc)
+		sim.tmp$cumburied <- cumsum(sim.tmp$buried)
+		# stack all data frames together
+		if(m==1) sim2 <- sim.tmp
+		if(m>1) sim2 <- rbind(sim2,sim.tmp)
+		
+		if (do.plot){
+			plot(inc,typ="o")
+			lines(inc.rep,col="orange")
+			lines(inc.rep.lag[1:length(inc)],col="red",lwd=3)
+			
+			lines(bur,col="navyblue",typ="o")
+			lines(bur.rep,col="lightblue")
+			lines(bur.rep.lag,col="blue",lwd=3)
+			abline(h=0, lty=2)		
+		}
+	}
+	return(sim2)
+}
+
+
+

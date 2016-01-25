@@ -57,11 +57,32 @@ sim <- SEIFR.sim(beta_IS, # contact rate I -> S
 )
 
 
+# Apply reporting layer:
+
+report.inc.prob <- 0.6
+report.inc.lag.mean <- 4 
+report.inc.lag.var <- 0.05 
+report.bur.prob <- 0.8 
+report.bur.lag.mean <- 3
+report.bur.lag.var <- 0.02
+seed  <-  1234
+
+sim2 <- reporting.filter(sim,
+						 report.inc.prob, 
+						 report.inc.lag.mean, 
+						 report.inc.lag.var, 
+						 report.bur.prob, 
+						 report.bur.lag.mean,
+						 report.bur.lag.var,
+						 seed)
+
+
+
 ### Plots just one Monte Carlo iteration
 
 mc.chosen <- n.MC  # Choose any one
 
-g <- ggplot(subset(sim,mc==mc.chosen))+geom_step(aes(x=tb,y=inc),size=2)
+g <- ggplot(subset(sim2,mc==mc.chosen))+geom_step(aes(x=tb,y=inc),size=2)
 g <- g + geom_step(aes(x=tb,y=buried),size=2,colour="red")
 plot(g)
 
