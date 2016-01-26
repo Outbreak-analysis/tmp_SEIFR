@@ -107,8 +107,8 @@ lines(obs.data$tb, obs.data$bur, typ="s",col="red",lwd=3)
 
 # Specify which parameters will be calibrated:
 prm.fit <- list(beta_IS=0.999, beta_FS=0.999)
-priors <-  list(c("unif",0.001,2),
-				c("unif",0.001,2))
+priors <-  list(c("unif",0.05,2),
+				c("unif",0.05,2))
 
 # Fixed parameters (will NOT be calibrated):
 prm.fixed  <- list(DOL.days=DOL.days,  # avg duration of latency
@@ -125,8 +125,8 @@ prm.fixed  <- list(DOL.days=DOL.days,  # avg duration of latency
 )
 
 horizon <- hz+20  
-n.ABC <- 30
-tol.ABC <- 0.2
+n.ABC <- 1000
+tol.ABC <- 0.05
 
 # Summary statistics definition
 prm.stats <- list(first.time = 6, 
@@ -137,7 +137,18 @@ stat.type <- list(inc.poisson.reg=TRUE,
 				  inc.max = TRUE,
 				  bur.max = FALSE)
 
+# Swicth DC's hack on and off:
+do.DC_HACK <- TRUE
+
+if(do.DC_HACK){
+	library(parallel)
+	source("problem-easyabc/EasyABC-internal-DC_HACK.R")
+	source("problem-easyabc/ABC_rejection-DC_HACK.R")
+}
+
 # Calibration with ABC:
+t1 <- as.numeric(Sys.time())
+
 post.abc <- fit.abc(prm.fit, 
 					prm.fixed, 
 					obs.data,
@@ -147,14 +158,19 @@ post.abc <- fit.abc(prm.fit,
 					horizon,  
 					n.ABC,
 					tol.ABC,
-					multi.core = FALSE # <-- TRUE does not work!
+					multi.core = TRUE # <-- TRUE does not work!
 					)
+
+t2 <- as.numeric(Sys.time())
+print(paste0("ABC fit done in ",round((t2-t1)/60,2)," minutes."))
 
 # Visualize posteriors:
 par(mfrow=c(1,3))
 plot(post.abc$param[,1],post.abc$param[,2])
+abline(v=mean(post.abc$param[,1]))
+abline(h=mean(post.abc$param[,2]))
 points(beta_IS, beta_FS,col="red",cex=5,pch=16)
-plot(density(post.abc$param[,1]))
+hist(post.abc$param[,1],breaks=12,col="grey")
 abline(v=beta_IS,col="red")
-plot(density(post.abc$param[,2]))
+hist(post.abc$param[,2],breaks=12,col="grey")
 abline(v=beta_FS,col="red")

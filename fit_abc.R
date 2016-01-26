@@ -132,7 +132,7 @@ fit.abc <- function(prm.fit,
 	
 	# Use of 'EasyABC' package:
 	nc <- 1
-	if (multi.core) nc <- 2  # temporary code
+	if (multi.core) nc <- 4  # temporary code
 	
 	posterior <- ABC_rejection(model = wrap.abc, 
 							   use_seed = multi.core,
@@ -142,5 +142,6 @@ fit.abc <- function(prm.fit,
 							   summary_stat_target = sum.stat.obs,
 							   tol = tol.ABC,
 							   progress_bar = TRUE)
+	
 	return(posterior)
 }

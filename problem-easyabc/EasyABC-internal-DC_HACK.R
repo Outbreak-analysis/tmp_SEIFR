@@ -2887,8 +2887,16 @@ dc_ABC_rejection_cluster <- function(model, prior, prior_test, nb_simul, seed_co
     
     # DC_HACK: FORCE TO EXPORT ALL FUNCTION IN ENVIRONMENT
     warning("-- -- DC_HACK : dc_ABC_rejection_cluster -- --")
-    ex <- Filter(function(x) is.function(get(x, .GlobalEnv)), ls(.GlobalEnv)) ; 
+    #ex <- Filter(function(x) is.function(get(x, .GlobalEnv)), ls(.GlobalEnv)) ; 
+    ex <- Filter(function(x) !is.null(get(x, .GlobalEnv)), ls(.GlobalEnv)) ; 
     clusterExport(cl, ex)
+    
+    # added specifically for SEIFR:
+    clusterEvalQ(cl, {
+    	library(adaptivetau)
+    	library(plyr)})
+    
+    
     # END OF DC_HACK
     
     tab_simul_summarystat = NULL
