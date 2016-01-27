@@ -149,13 +149,8 @@ trans.rate.SEIFR <- function(x, prm, t){
 }
 
 SEIFR.sim <-function(model.prm, # List of all model parameters
-					 horizon,  # horizon of the simulation
-					 n.MC,   # Monte carlo iterations
+					 simul.prm, # List of all simulation parameters
 					 seed = NULL,
-					 do.adaptivetau = TRUE, # FALSE = true Gillespie algo ; TRUE=approximation
-					 epsilon = 0.05, # larger=faster but less accurate
-					 time.bucket = 1,  # aggregation of incidence in time units (Gillespie events happens any time)
-					 remove.fizzles = FALSE,  # remove Monte carlo iterations that are fizzles,
 					 display.MC.count = FALSE
 ){
 	###
@@ -178,6 +173,18 @@ SEIFR.sim <-function(model.prm, # List of all model parameters
 	nF<- model.prm[["nF"]]   # number of (artificial) compartments for F
 	chgcontact <- model.prm[["chgcontact"]]  # temporal change in the contact rates (intervention,behaviour,...)
 	t.chgcontact <- model.prm[["t.chgcontact"]]  # time when the change starts
+	
+	horizon <- simul.prm[["horizon"]]
+	n.MC <- simul.prm[["n.MC"]]
+	do.adaptivetau <- simul.prm[["do.adaptivetau"]]
+	epsilon <- simul.prm[["epsilon"]]
+	time.bucket <- simul.prm[["time.bucket"]]
+	remove.fizzles <- simul.prm[["remove.fizzles"]]
+	
+	if(is.null(do.adaptivetau)) do.adaptivetau <- TRUE
+	if(is.null(epsilon)) epsilon <- 0.05
+	if(is.null(time.bucket)) time.bucket <- 1
+	if(is.null(remove.fizzles)) remove.fizzles <- FALSE
 	
 	if(F){print("DEBUG - model param:")
 	print(model.prm)
@@ -276,13 +283,12 @@ SEIFR.sim <-function(model.prm, # List of all model parameters
 		all.sim.nofizz <- all.sim[all.sim$mc %in% mc.nofizz,]
 		all.sim <- all.sim.nofizz
 	}
-	### Incidence only at time buckets ('tb')
+	### Data only at time buckets ('tb')
 	inc.tb <- ddply(all.sim,c("tb","mc"),summarize,
 					inc = sum(inc),
 					cuminc = max(cuminc),
 					buried = sum(buried),
 					cumburied = max(cumburied))
-	
 	return(inc.tb)
 }
 
@@ -322,22 +328,26 @@ lag.fct <- function(x,lag.mean,lag.var, seed=1234){
 
 
 reporting.filter <- function(sim,
-							 report.inc.prob, 
-							 report.inc.lag.mean, 
-							 report.inc.lag.var, 
-							 report.bur.prob, 
-							 report.bur.lag.mean,
-							 report.bur.lag.var,
+							 prm,
 							 seed = 1234,
 							 do.plot = FALSE){
 	###
 	### Add a reporting "layer" to the simulated epidemic
 	###
 	
+	# Unpack parameters:
+	report.inc.prob <- prm[["report.inc.prob"]] 
+	report.inc.lag.mean <- prm[["report.inc.lag.mean"]] 
+	report.inc.lag.var <- prm[["report.inc.lag.var"]] 
+	report.bur.prob <- prm[["report.bur.prob"]] 
+	report.bur.lag.mean <- prm[["report.bur.lag.mean"]]
+	report.bur.lag.var <- prm[["report.bur.lag.var"]]
+	
 	set.seed(seed)
 	n.mc <- max(sim$mc)
 	
 	for(m in 1:n.mc) {
+		#print(m)
 		tmp <- subset(sim,mc==m)
 		inc <- tmp$inc
 		bur <- tmp$buried

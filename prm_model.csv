@@ -1,0 +1,13 @@
+DOL.days,5
+DOI.days,6
+funeral.days,1
+delta,0.65
+R0,2.5
+rho,1.0
+pop.size,1000
+nE,3
+nI,4
+nF,2
+I.init,1
+chgcontact,0
+t.chgcontact,999

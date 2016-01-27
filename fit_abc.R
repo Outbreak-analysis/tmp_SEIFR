@@ -7,8 +7,6 @@ library(parallel)
 
 source("seifr_gillespie.R")
 
-
-
 abc.stats <- function(sim,
 					  prm, # input parameters for calculating the summary stats
 					  stat.type, # type of summary stats desired
@@ -85,7 +83,7 @@ fit.abc <- function(prm.fit,
 					horizon,  
 					n.ABC,
 					tol.ABC,
-					multi.core = FALSE
+					multi.core = 0
 ){
 	# Summary stats of observed data:
 	sum.stat.obs <- abc.stats(sim = obs.data,
@@ -93,36 +91,17 @@ fit.abc <- function(prm.fit,
 							  stat.type = stat.type)
 	
 	prm.fit.vec <- rapply(prm.fit, c)
-	
-	# --- DEBUG
-	
-	if(F) {
-		prm.fixed <<- prm.fixed
-		SEIFR.sim <<- SEIFR.sim
-		abc.stats <<- abc.stats
-	}
-	
-	if (F){  # multi.core
-		cn <- get.clustername()
-		if(!is.na(cn)) {
-			mycl <- get(cn)
-			
-			parallel::clusterExport(cl=mycl, 	
-									varlist = list("prm.fixed"),
-									envir=.GlobalEnv) #environment())
-		}
-	}
-	# --- DEBUG
-	
+
 	wrap.abc <- function(x=prm.fit.vec){
 		# Merge all model parameters:
 		all.prm <-  as.list(c(prm.fit.vec,prm.fixed))
+		simul.prm <- list(horizon=horizon, 
+						  n.MC=1,
+						  do.adaptivetau = TRUE,
+						  epsilon = 0.05)
 		# Simulate:
 		sim <- SEIFR.sim(model.prm = all.prm,
-						 horizon = horizon,
-						 n.MC = 1,
-						 do.adaptivetau = TRUE,
-						 epsilon = 0.05)
+						 simul.prm = simul.prm )
 		# Calculate summary stats:
 		sum.stat <- abc.stats(sim = sim, 
 							  prm = prm.stats,
@@ -131,11 +110,13 @@ fit.abc <- function(prm.fit,
 	}
 	
 	# Use of 'EasyABC' package:
-	nc <- 1
-	if (multi.core) nc <- 4  # temporary code
+	maxcores <- detectCores()
+	
+	if (multi.core>0) nc <- min(multi.core,maxcores)
+	if (multi.core<=0) nc <- max(1,maxcores-multi.core)
 	
 	posterior <- ABC_rejection(model = wrap.abc, 
-							   use_seed = multi.core,
+							   use_seed = (nc>1),
 							   n_cluster = nc,
 							   prior = priors, 
 							   nb_simul = n.ABC,

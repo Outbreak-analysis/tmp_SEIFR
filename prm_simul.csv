@@ -1,0 +1,6 @@
+do.adaptivetau,1
+epsilon,0.05
+n.MC,5
+horizon,180
+time.bucket,1
+remove.fizzles,0

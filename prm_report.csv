@@ -1,0 +1,6 @@
+report.inc.prob, 0.6
+report.inc.lag.mean, 4 
+report.inc.lag.var, 0.05 
+report.bur.prob, 0.8 
+report.bur.lag.mean, 3
+report.bur.lag.var, 0.02
