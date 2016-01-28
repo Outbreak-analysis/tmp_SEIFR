@@ -54,7 +54,7 @@ prm.fixed[which(names(prm.fixed) %in% names(prm.fit))] <- NULL
 
 horizon <- hz+20  
 n.ABC <- 100
-tol.ABC <- 0.15
+tol.ABC <- 0.20
 
 # Summary statistics definition
 prm.stats <- list(first.time = 6, 
