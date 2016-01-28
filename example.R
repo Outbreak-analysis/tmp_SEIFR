@@ -20,7 +20,7 @@ sim <- SEIFR.sim(model.prm, simul.prm, seed = 1234)
 report.prm <- read.param("prm_report.csv")
 sim2 <- reporting.filter(sim,prm=report.prm)
 
-### Plots just one Monte Carlo iteration
+### (optional) Plots just one Monte Carlo iteration
 if (FALSE){
 	mc.chosen <- 1  # Choose any one
 	g <- ggplot(subset(sim2,mc==mc.chosen)) + geom_step(aes(x=tb,y=inc),size=2)
@@ -28,23 +28,23 @@ if (FALSE){
 	plot(g)
 }
 
-
 ###
 ###    FAKE CALIBRATION WITH 'ABC'
 ###
 
 # We pretend that the first simulation data set 'mc=1'
-# is an actual observation:
+# is an actual observation until a specified horizon ('hz'):
 hz <- 23
 obs.data <- subset(sim2,mc==1 & tb<=hz)
-
+# How the data look like:
 plot(obs.data$tb, obs.data$inc, typ="s",lwd=3)
 lines(obs.data$tb, obs.data$bur, typ="s",col="red",lwd=3)
 
 # Specify which parameters will be calibrated
 # and their prior distributions:
-prm.fit <- list(beta_IS=0.999, beta_FS=0.999)  # <- values do not matter here
-priors <-  list(c("unif",0.05,3),
+prm.fit <- list(beta_IS=0.999, 
+				beta_FS=0.999)  # <- param values do not matter here
+priors <-  list(c("unif",0.05,3),  
 				c("unif",0.05,3))
 
 # Fixed parameters (will NOT be calibrated):
@@ -56,18 +56,30 @@ horizon <- hz+20
 n.ABC <- 100
 tol.ABC <- 0.20
 
-# Summary statistics definition
+# Summary statistics definition.
+# What kind of summary statistics
+# will be used to assess the proximity
+# to observed (target) data
+#
+# Time range where the 
+# summary stats are aplied:
 prm.stats <- list(first.time = 6, 
 				  last.time = hz)
+# Type of summary stats
+# inc.poisson.reg : poisson regression on incidence
+# bur.poisson.reg : poisson regression on burials
+# inc.max : level and timing of max incidence
+# bur.max : level and timing of max burials
 
-stat.type <- list(inc.poisson.reg=TRUE,
-				  bur.poisson.reg=TRUE,
+stat.type <- list(inc.poisson.reg = TRUE,
+				  bur.poisson.reg = TRUE,
 				  inc.max = TRUE,
 				  bur.max = FALSE)
 
 # Swicth DC's hack on and off:
+# (the hack is about fixing an issue
+# in EasyABC package when run on multi-cores)
 do.DC_HACK <- TRUE
-
 if(do.DC_HACK){
 	library(parallel)
 	source("problem-easyabc/EasyABC-internal-DC_HACK.R")
@@ -90,7 +102,9 @@ post.abc <- fit.abc(prm.fit,
 )
 
 t2 <- as.numeric(Sys.time())
-print(paste0("ABC fit done in ",round((t2-t1)/60,2)," minutes."))
+message(paste0("ABC fit done in ",round((t2-t1)/60,2)," minutes."))
+
+save.image("sim.RData")
 
 # Visualize posteriors:
 par(mfrow=c(1,3))

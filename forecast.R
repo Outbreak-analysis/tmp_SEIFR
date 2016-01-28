@@ -9,7 +9,6 @@ forecast.after.fit <- function(obs.data,
 							   prm.fit,
 							   prm.fixed,
 							   simul.fcast.prm){
-	
 
 	# Check forecasting horizon is long enough
 	if (max(obs.data$tb)>=simul.prm[["horizon"]]) 
@@ -84,7 +83,7 @@ forecast.after.fit <- function(obs.data,
 # 	g <- g + geom_line(data=obs.data,aes(x=tb,y=inc.hi),colour="orange",size=1)
 # 	g <- g + geom_line(data=obs.data,aes(x=tb,y=inc.lo),colour="orange",size=2)
 	g <- g + geom_point(data=obs.data,aes(x=tb,y=buried),colour="blue",size=2)
-	g <- g + geom_ribbon(data=obs.data,aes(x=tb,ymax=inc.hi,ymin=inc.lo),alpha=0.2)
+	g <- g + geom_segment(data=obs.data,aes(x=tb,xend=tb,yend=inc.hi,y=inc.lo),alpha=0.8,colour="orange",size=2)
 	# g <- g + scale_y_log10()
 	plot(g)
 	
