@@ -1,94 +1,105 @@
+library(snowfall)
+
 source("seifr_gillespie.R")
 
-
-simul.fcast.prm = simul.prm
-simul.fcast.prm[["horizon"]] <- max(obs.data$tb)+10
-
-forecast.after.fit <- function(obs.data,
-							   post.abc,
-							   prm.fit,
-							   prm.fixed,
-							   simul.fcast.prm){
-
-	# Check forecasting horizon is long enough
+forecast.one.postsample <- function(obs.data,
+									param,
+									prm.fit,
+									prm.fixed,
+									simul.fcast.prm){
+	###
+	### FORECAST BASED ON ONE FITTED PARAMETER VECTOR ('param')
+	###
+	### Returns a data frame of n.MC simulations run with
+	### the unique parameter set provided
+	
+	
+	# Check if forecasting horizon is long enough
 	if (max(obs.data$tb)>=simul.prm[["horizon"]]) 
 		stop("Forecasting horizon is not beyond observed data!")
 	
-	# number of posterior samples
-	nps <- nrow(post.abc$param)
+	print(paste("Each forecast made with",
+				simul.fcast.prm[["n.MC"]],
+				"MC iterations for a given posterior sample parameter"))
 	
-	sim.post <- list()
-	for (i in 1:nps){
-		print(i)
-		# Reconstruct model parameters:
-		prm.fit.i <- as.list(post.abc$param[i,])
-		names(prm.fit.i) <- names(prm.fit)
-		model.prm.i <- c(prm.fit.i, prm.fixed)
-		
-		# Simulate
-		sim.post[[i]] <- SEIFR.sim(model.prm = model.prm.i, 
-								   simul.prm = simul.fcast.prm)
-		sim.post[[i]]$key <- paste(i,sim.post[[i]]$mc,sep="-")
-		
-	}
 	
-	df <- do.call("rbind", sim.post)
+	# Reconstruct model parameters:
+	prm.fit.tmp <- as.list(param)
+	names(prm.fit.tmp) <- names(prm.fit)
+	model.prm <- c(prm.fit.tmp, prm.fixed)
 	
-	t.last <- max(obs.data$tb)
-	last.rng <- 3
-	t.keep <- c((t.last-last.rng+1):t.last)
-	
-	# Calculate 'true' incidence that
-	# is consistent with reporting rate 
-	# and observed data
-	report.rate.inc <- 0.5
-	report.rate.bur <- 0.9
-	CI <- 0.98
-	q <- 1-CI
-	obs.data$inc.lo <- obs.data$inc + qnbinom(p=q/2, size = obs.data$inc, prob = report.rate.inc)
-	obs.data$inc.hi <- obs.data$inc + qnbinom(p=1-q/2, size = obs.data$inc, prob = report.rate.inc)
-	inc.lo <- obs.data$inc.lo[t.keep]
-	inc.hi <- obs.data$inc.hi[t.keep]
-	
-	# Keep only simulations that
-	# go through the latest observed data
-	# TO DO: ADD BURIAL NUMBERS
-	keys <- unique(df$key)
-	nk <- length(keys)
-	key.keep <- list()
-	cnt <- 1
-	for(i in 1:nk){
-		# Retrieve just the time window requested for accepting simulations:
-		tmp <- subset(df,key==keys[i] & tb<=t.last & tb>=t.keep[1] )
-		# Check if simulated incidence is consistent with
-		# estimated (true) target incidence  (estimated from observed&reporting rate)
-		check.inc <- FALSE
-		if (nrow(tmp)>length(inc.lo)){
-			check.inc <- all(tmp$inc>= inc.lo & tmp$inc<=inc.hi)
-			if(length(tmp$inc)!=length(inc.lo)) print(i)
-		}
-		# If satisfy all conditions, then accept this simulation:
-		if (check.inc) {
-			key.keep[[cnt]] <- keys[i]
-			cnt <- cnt+1
-		}
-	}
+	# Simulate
+	sim.post <- SEIFR.sim(model.prm = model.prm, 
+						  simul.prm = simul.fcast.prm)
+	return(sim.post)
+}
 
+forecast.fullreport <- function(obs.data,
+								post.abc,
+								prm.fit,
+								prm.fixed,
+								simul.fcast.prm,
+								multi.core=0) {
+	###
+	### FORECAST ASSUMING FULL REPORTING
+	### AND SAMPLING FROM POSTERiORS
+	###
+	n.prm <- nrow(post.abc$param)
 	
-	df.keep <- df[df$key %in% key.keep,]
+	message(paste("Number of posterior samples:",n.prm))
+	message(paste("MC iterations for each sample:",simul.fcast.prm[["n.MC"]]))
+	message(paste("==>",n.prm*simul.fcast.prm[["n.MC"]],"simulations in total"))
 	
-	g <- ggplot(df.keep) + geom_line(aes(x=tb, y=inc,dummy=factor(key)),alpha=0.3)
-	g <- g + geom_line(aes(x=tb, y=inc*report.rate.inc,dummy=factor(key)),alpha=0.3,colour="red")
-	g <- g + geom_step(data=obs.data,aes(x=tb,y=inc),colour="red",size=2)
-# 	g <- g + geom_line(data=obs.data,aes(x=tb,y=inc.hi),colour="orange",size=1)
-# 	g <- g + geom_line(data=obs.data,aes(x=tb,y=inc.lo),colour="orange",size=2)
-	g <- g + geom_point(data=obs.data,aes(x=tb,y=buried),colour="blue",size=2)
-	g <- g + geom_segment(data=obs.data,aes(x=tb,xend=tb,yend=inc.hi,y=inc.lo),alpha=0.8,colour="orange",size=2)
-	# g <- g + scale_y_log10()
-	plot(g)
+	library(parallel)
+	maxcores <- detectCores()
+	if (multi.core > 0) nc <- min(multi.core,maxcores)
+	if (multi.core <= 0) nc <- max(1,maxcores - multi.core)
 	
+	sfInit(parallel = (nc>1), cpu = nc)
+	sfLibrary(adaptivetau)
+	sfLibrary(plyr)
 	
+	snow.wrap <- function(i){
+		x <- forecast.one.postsample(obs.data,
+									 param = post.abc$param[i,],
+									 prm.fit,
+									 prm.fixed,
+									 simul.fcast.prm)
+		x$prmset <- i
+		return(x)
+	}
 	
+	# Run all simulations for each posterior parameter set:
+	idx.apply <- 1:n.prm
+	sfExportAll()
+	res <- sfSapply(idx.apply, snow.wrap, simplify = FALSE)
+	sfStop()
+	# Merge all results in one data frame
+	df <- do.call("rbind",res)
 	
+	# Summarize across all
+	# Monte Carlo iterations and
+	# posterior samples:
+	
+	# TO DO: implement te rest (not only incidence)
+	
+	df2 <- ddply(df,c("tb"),summarize, 
+				 inc.m = mean(inc),
+				 inc.md = median(inc),
+				 inc.lo = quantile(inc,probs=0.10),
+				 inc.hi = quantile(inc,probs=0.90))
+	return(df2)
+}
+
+plot.forecast <- function(x, obs.data) {
+	plot(x$tb, 
+		 x$inc.m,
+		 ylim = range(obs.data,x$inc.hi,x$inc.lo))
+	
+	points(obs.data$tb,obs.data$inc,
+		   pch=3,col="red")
+	lines(x$tb,x$inc.lo)
+	lines(x$tb,x$inc.hi)
 	
 }
+

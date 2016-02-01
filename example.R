@@ -32,10 +32,10 @@ if (FALSE){
 ###    FAKE CALIBRATION WITH 'ABC'
 ###
 
-# We pretend that the first simulation data set 'mc=1'
+# We pretend that one simulation data set 'mc'
 # is an actual observation until a specified horizon ('hz'):
-hz <- 23
-obs.data <- subset(sim2,mc==1 & tb<=hz)
+hz <- 19
+obs.data <- subset(sim2,mc==2 & tb<=hz)
 # How the data look like:
 plot(obs.data$tb, obs.data$inc, typ="s",lwd=3)
 lines(obs.data$tb, obs.data$bur, typ="s",col="red",lwd=3)
@@ -53,7 +53,8 @@ prm.fixed  <- model.prm
 prm.fixed[which(names(prm.fixed) %in% names(prm.fit))] <- NULL  
 
 horizon <- hz+20  
-n.ABC <- 100
+n.MC <- 7
+n.ABC <- 50
 tol.ABC <- 0.20
 
 # Summary statistics definition.
@@ -63,7 +64,7 @@ tol.ABC <- 0.20
 #
 # Time range where the 
 # summary stats are aplied:
-prm.stats <- list(first.time = 6, 
+prm.stats <- list(first.time = 10, 
 				  last.time = hz)
 # Type of summary stats
 # inc.poisson.reg : poisson regression on incidence
@@ -72,8 +73,8 @@ prm.stats <- list(first.time = 6,
 # bur.max : level and timing of max burials
 
 stat.type <- list(inc.poisson.reg = TRUE,
-				  bur.poisson.reg = TRUE,
-				  inc.max = TRUE,
+				  bur.poisson.reg = FALSE,
+				  inc.max = FALSE,
 				  bur.max = FALSE)
 
 # Swicth DC's hack on and off:
@@ -96,6 +97,7 @@ post.abc <- fit.abc(prm.fit,
 					stat.type,
 					priors,
 					horizon,  
+					n.MC,
 					n.ABC,
 					tol.ABC,
 					multi.core = 0 
@@ -118,3 +120,19 @@ hist(post.abc$param[,1],breaks=12,col="grey")
 abline(v=beta_IS,col="red")
 hist(post.abc$param[,2],breaks=12,col="grey")
 abline(v=beta_FS,col="red")
+
+
+# Forecast
+
+simul.fcast.prm = simul.prm
+simul.fcast.prm[["horizon"]] <- max(obs.data$tb)+10
+simul.fcast.prm[["n.MC"]] <- 15
+
+x <- forecast.fullreport(obs.data,
+						 post.abc,
+						 prm.fit,
+						 prm.fixed,
+						 simul.fcast.prm)
+par(mfrow=c(1,1))
+plot.forecast(x, obs.data)
+
