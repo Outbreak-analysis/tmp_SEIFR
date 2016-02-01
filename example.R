@@ -8,6 +8,7 @@
 source("seifr_gillespie.R")
 source("fit_abc.R")
 source("utils.R")
+source("forecast.R")
 
 # Read parameters from files:
 simul.prm <- read.param("prm_simul.csv")
