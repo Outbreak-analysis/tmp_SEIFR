@@ -53,10 +53,12 @@ priors <-  list(c("unif",0.05,3),
 prm.fixed  <- model.prm
 prm.fixed[which(names(prm.fixed) %in% names(prm.fit))] <- NULL  
 
-horizon <- hz+20  
-n.MC <- 7
-n.ABC <- 50
-tol.ABC <- 0.20
+pf <- read.csv("prm_fit.csv",header=FALSE)
+horizon <- pf[pf[,1]=="horizon",2]  
+n.MC <- pf[pf[,1]=="n.MC",2]  
+n.ABC <- pf[pf[,1]=="n.ABC",2]  
+tol.ABC <- pf[pf[,1]=="tol.ABC",2]  
+first.time <- pf[pf[,1]=="first.t.stat",2]  
 
 # Summary statistics definition.
 # What kind of summary statistics
@@ -65,14 +67,14 @@ tol.ABC <- 0.20
 #
 # Time range where the 
 # summary stats are aplied:
-prm.stats <- list(first.time = 10, 
-				  last.time = hz)
+prm.stats <- list(first.time = first.time, 
+				  last.time = max(obs.data$tb))
+
 # Type of summary stats
 # inc.poisson.reg : poisson regression on incidence
 # bur.poisson.reg : poisson regression on burials
 # inc.max : level and timing of max incidence
 # bur.max : level and timing of max burials
-
 stat.type <- list(inc.poisson.reg = TRUE,
 				  bur.poisson.reg = FALSE,
 				  inc.max = FALSE,
@@ -123,11 +125,13 @@ hist(post.abc$param[,2],breaks=12,col="grey")
 abline(v=beta_FS,col="red")
 
 
-# Forecast
+###   Forecast   ###
+
+pfcst <- read.csv("prm_forecast.csv",header=FALSE)
 
 simul.fcast.prm = simul.prm
-simul.fcast.prm[["horizon"]] <- max(obs.data$tb)+10
-simul.fcast.prm[["n.MC"]] <- 15
+simul.fcast.prm[["horizon"]] <- pfcst[pfcst[,1]=="horizon",2]  
+simul.fcast.prm[["n.MC"]] <- pfcst[pfcst[,1]=="n.MC",2]  
 
 x <- forecast.fullreport(obs.data,
 						 post.abc,
