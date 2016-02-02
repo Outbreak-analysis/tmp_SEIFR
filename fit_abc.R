@@ -160,3 +160,72 @@ fit.abc <- function(prm.fit,
 	)
 	return(posterior)
 }
+
+
+post.stat <- function(pp,i,j,CI) {
+	q.lo <- (1-CI)/2
+	q.hi <- 1-q.lo
+	x.m <- mean(pp[,i])
+	x.lo <- quantile(pp[,i],probs=q.lo)
+	x.hi <- quantile(pp[,i],probs=q.hi)
+	y.m <- mean(pp[,j])
+	y.lo <- quantile(pp[,j],probs=q.lo)
+	y.hi <- quantile(pp[,j],probs=q.hi)
+	return(list(x.m=x.m,x.lo=x.lo,x.hi=x.hi,y.m=y.m,y.lo=y.lo,y.hi=y.hi))
+}
+
+
+
+
+plot.abcfit <- function(post.abc,prm.fit,priors,true.values=NULL){
+	###
+	### Plot posterior distributions
+	
+	pp <- as.data.frame(post.abc$param,row.names=c(1:nrow(post.abc$param)))
+	colnames(pp) <- names(prm.fit)
+	np <- ncol(pp)
+	ns <- nrow(pp)
+	pr <- as.data.frame(priors)
+	
+	snp <- ceiling(sqrt(np))
+	par(mfrow=c(snp,snp))
+	for (i in 1:np) {
+		for (j in 1:np) {
+			if(j>i){
+			# print(paste(i,j))
+			plot(pp[,i],pp[,j],
+				 xlab = names(prm.fit)[i],
+				 ylab = names(prm.fit)[j],
+				 xlim = as.numeric(as.character(pr[-1,i])), 
+				 ylim = as.numeric(as.character(pr[-1,j])))
+			grid()
+			z <- post.stat(pp,i,j,CI = 0.90)
+			segments(x0 = z[["x.lo"]], x1=z[["x.hi"]], y0=z[["y.m"]], y1=z[["y.m"]])
+			segments(x0 = z[["x.m"]], x1=z[["x.m"]], y0=z[["y.lo"]], y1=z[["y.hi"]])
+			
+			if(!is.null(true.values)){
+				points(true.values[[i]],true.values[[j]],pch=5,col="red",cex=2,lwd=4)
+			}
+			
+			}
+		}
+	}
+	
+	par(mfrow=c(snp,snp))
+	for (i in 1:np) {
+		hist(pp[,i],
+			 main="",
+			 breaks=15,
+			 xlim = as.numeric(as.character(pr[-1,i])), 
+			 xlab = names(prm.fit)[i], 
+			 col="grey",border="darkgrey")
+		
+		if(!is.null(true.values))
+			abline(v=true.values[[i]],col="red",lwd=3)
+	}
+}
+
+
+
+
+

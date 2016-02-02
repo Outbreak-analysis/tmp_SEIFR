@@ -81,33 +81,49 @@ forecast.fullreport <- function(obs.data,
 	# Monte Carlo iterations and
 	# posterior samples:
 	
-	# TO DO: implement te rest (not only incidence)
-	
 	df2 <- ddply(df,c("tb"),summarize, 
 				 inc.m = mean(inc),
 				 inc.md = median(inc),
 				 inc.lo = quantile(inc,probs=0.10),
-				 inc.hi = quantile(inc,probs=0.90))
+				 inc.hi = quantile(inc,probs=0.90),
+				 buried.m = mean(buried),
+				 buried.md = median(buried),
+				 buried.lo = quantile(buried,probs=0.10),
+				 buried.hi = quantile(buried,probs=0.90)
+				 )
 	return(df2)
+}
+
+
+
+plot.tmp <- function(var, x,obs.data, obs.data.full=NULL) {
+	
+	var.m <- paste0(var,".m")
+	var.lo <- paste0(var,".lo")
+	var.hi <- paste0(var,".hi")
+	
+	plot(x$tb, 
+		 x[,var.m],
+		 ylim = range(obs.data,x[,var.lo],x[,var.hi]),
+		 xlab="time",ylab="",main=var)
+	lines(x$tb,x[,var.lo])
+	lines(x$tb,x[,var.hi])
+	grid()
+	
+	if(!is.null(obs.data.full)){
+		points(obs.data.full$tb,obs.data.full[,var],
+			   pch=3,col="red")
+	}
+	points(obs.data$tb,obs.data[,var],
+		   pch=3,col="red",lwd=5)
+	
+	abline(v=obs.data$tb[length(obs.data$tb)],lty=2)
 }
 
 plot.forecast <- function(x, obs.data, obs.data.full=NULL) {
 	
-	plot(x$tb, 
-		 x$inc.m,
-		 ylim = range(obs.data,x$inc.hi,x$inc.lo))
-	lines(x$tb,x$inc.lo)
-	lines(x$tb,x$inc.hi)
-	
-	
-	if(!is.null(obs.data.full)){
-	   points(obs.data.full$tb,obs.data.full$inc,
-		   pch=3,col="red")
-	}
-	points(obs.data$tb,obs.data$inc,
-		   pch=3,col="red",lwd=5)
-	
-	abline(v=obs.data$tb[length(obs.data$tb)],lty=2)
+	plot.tmp(var="inc", x,obs.data, obs.data.full)
+	plot.tmp(var="buried", x,obs.data, obs.data.full)
 	
 }
 

@@ -15,6 +15,7 @@ pdf.options(width=15,height=10)
 # Read parameters from files:
 simul.prm <- read.param("prm_simul.csv")
 model.prm <- calc.beta(read.param("prm_model.csv"))
+model.prm.true <- model.prm
 
 # Simulate epidemics:
 t1 <- as.numeric(Sys.time())
@@ -49,10 +50,13 @@ lines(obs.data$tb, obs.data$bur, typ="s",col="red",lwd=3)
 
 # Specify which parameters will be calibrated
 # and their prior distributions:
-prm.fit <- list(beta_IS=0.999, 
-				beta_FS=0.999)  # <- param values do not matter here
+prm.fit <- list(beta_IS = 0.999, 
+				beta_FS = 0.999,
+				DOL.days = 99)  # <- param values do not matter here
+
 priors <-  list(c("unif",0.05,3),  
-				c("unif",0.05,3))
+				c("unif",0.05,3),
+				c("unif",1,7))
 
 # Fixed parameters (will NOT be calibrated):
 # (take the original model params and remove the ones that will be)
@@ -123,18 +127,8 @@ message(paste0("ABC fit done in ",round((t2-t1)/60,2)," minutes."))
 save.image("sim.RData")
 
 # Visualize posteriors:
-par(mfrow=c(1,3))
-beta_IS <- model.prm[["beta_IS"]] 
-beta_FS <- model.prm[["beta_FS"]] 
-plot(post.abc$param[,1],post.abc$param[,2],xlim=c(0,3),ylim=c(0,3))
-abline(v=mean(post.abc$param[,1]))
-abline(h=mean(post.abc$param[,2]))
-points(beta_IS, beta_FS,col="red",cex=5,pch=16)
-hist(post.abc$param[,1],breaks=12,col="grey")
-abline(v=beta_IS,col="red")
-hist(post.abc$param[,2],breaks=12,col="grey")
-abline(v=beta_FS,col="red")
-
+true.values <- model.prm.true[names(prm.fit)]
+plot.abcfit(post.abc,prm.fit,priors,true.values)
 
 ###   Forecast   ###
 
