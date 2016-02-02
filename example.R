@@ -10,22 +10,27 @@ source("fit_abc.R")
 source("utils.R")
 source("forecast.R")
 
+pdf.options(width=15,height=10)
+
 # Read parameters from files:
 simul.prm <- read.param("prm_simul.csv")
 model.prm <- calc.beta(read.param("prm_model.csv"))
 
 # Simulate epidemics:
+t1 <- as.numeric(Sys.time())
 sim <- SEIFR.sim(model.prm, simul.prm, seed = 1234)
+t2 <- as.numeric(Sys.time())
+message(paste("first simulations:",round((t2-t1)/60,2),"minutes"))
 
 # Apply reporting layer:
 report.prm <- read.param("prm_report.csv")
 sim2 <- reporting.filter(sim,prm=report.prm)
 
 ### (optional) Plots just one Monte Carlo iteration
-if (FALSE){
-	mc.chosen <- 1  # Choose any one
-	g <- ggplot(subset(sim2,mc==mc.chosen)) + geom_step(aes(x=tb,y=inc),size=2)
-	g <- g + geom_step(aes(x=tb,y=buried),size=2,colour="red")
+if (TRUE){
+	mc.chosen <- c(1:9)  # Choose any one
+	g <- ggplot(subset(sim2,mc %in% mc.chosen)) + geom_step(aes(x=tb,y=inc),size=2)
+	g <- g + geom_step(aes(x=tb,y=buried),size=2,colour="red") + facet_wrap(~mc)
 	plot(g)
 }
 
@@ -36,7 +41,8 @@ if (FALSE){
 # We pretend that one simulation data set 'mc'
 # is an actual observation until a specified horizon ('hz'):
 hz <- 19
-obs.data <- subset(sim2,mc==2 & tb<=hz)
+obs.data.full <- subset(sim2, mc==2)
+obs.data <- subset(obs.data.full,tb <= hz)
 # How the data look like:
 plot(obs.data$tb, obs.data$inc, typ="s",lwd=3)
 lines(obs.data$tb, obs.data$bur, typ="s",col="red",lwd=3)
@@ -53,12 +59,15 @@ priors <-  list(c("unif",0.05,3),
 prm.fixed  <- model.prm
 prm.fixed[which(names(prm.fixed) %in% names(prm.fit))] <- NULL  
 
+# Calibration parameters:
 pf <- read.csv("prm_fit.csv",header=FALSE)
 horizon <- pf[pf[,1]=="horizon",2]  
 n.MC <- pf[pf[,1]=="n.MC",2]  
 n.ABC <- pf[pf[,1]=="n.ABC",2]  
 tol.ABC <- pf[pf[,1]=="tol.ABC",2]  
-first.time <- pf[pf[,1]=="first.t.stat",2]  
+first.time <- pf[pf[,1]=="first.t.stat",2] 
+tau.epsilon <- pf[pf[,1]=="tau.epsilon",2] 
+multi.core <- pf[pf[,1]=="multi.core",2] 
 
 # Summary statistics definition.
 # What kind of summary statistics
@@ -76,8 +85,8 @@ prm.stats <- list(first.time = first.time,
 # inc.max : level and timing of max incidence
 # bur.max : level and timing of max burials
 stat.type <- list(inc.poisson.reg = TRUE,
-				  bur.poisson.reg = FALSE,
-				  inc.max = FALSE,
+				  bur.poisson.reg = TRUE,
+				  inc.max = TRUE,
 				  bur.max = FALSE)
 
 # Swicth DC's hack on and off:
@@ -103,7 +112,9 @@ post.abc <- fit.abc(prm.fit,
 					n.MC,
 					n.ABC,
 					tol.ABC,
-					multi.core = 0 
+					tau.epsilon,
+					multi.core,
+					do.plot = FALSE
 )
 
 t2 <- as.numeric(Sys.time())
@@ -115,7 +126,7 @@ save.image("sim.RData")
 par(mfrow=c(1,3))
 beta_IS <- model.prm[["beta_IS"]] 
 beta_FS <- model.prm[["beta_FS"]] 
-plot(post.abc$param[,1],post.abc$param[,2])
+plot(post.abc$param[,1],post.abc$param[,2],xlim=c(0,3),ylim=c(0,3))
 abline(v=mean(post.abc$param[,1]))
 abline(h=mean(post.abc$param[,2]))
 points(beta_IS, beta_FS,col="red",cex=5,pch=16)
@@ -132,6 +143,7 @@ pfcst <- read.csv("prm_forecast.csv",header=FALSE)
 simul.fcast.prm = simul.prm
 simul.fcast.prm[["horizon"]] <- pfcst[pfcst[,1]=="horizon",2]  
 simul.fcast.prm[["n.MC"]] <- pfcst[pfcst[,1]=="n.MC",2]  
+simul.fcast.prm[["epsilon"]] <- pfcst[pfcst[,1]=="tau.epsilon",2]  
 
 x <- forecast.fullreport(obs.data,
 						 post.abc,
@@ -139,5 +151,6 @@ x <- forecast.fullreport(obs.data,
 						 prm.fixed,
 						 simul.fcast.prm)
 par(mfrow=c(1,1))
-plot.forecast(x, obs.data)
+plot.forecast(x, obs.data,obs.data.full)
 
+message("-END-")

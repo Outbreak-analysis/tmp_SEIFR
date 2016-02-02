@@ -1,5 +1,7 @@
 horizon,33
-n.MC, 7
-n.ABC,100
-tol.ABC,0.20
-first.t.stat, 8
+n.MC, 5
+n.ABC, 1000
+tol.ABC, 0.01
+first.t.stat, 10
+tau.epsilon, 0.15
+multi.core, 0

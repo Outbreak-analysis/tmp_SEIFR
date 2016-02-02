@@ -15,6 +15,8 @@ abc.stats <- function(sim,
 	### Summary statistics from epidemic data
 	###
 	
+	res <- vector()
+	
 	# Unpack input parameters:
 	t.first <- prm[["first.time"]]
 	t.last <- prm[["last.time"]]
@@ -26,39 +28,40 @@ abc.stats <- function(sim,
 	bur <- sim$buried[t.rng]
 	
 	# Poisson regressions on incidence and burials:
-	rg.inc <-
-		try(glm(inc ~ t,family = "poisson")[["coefficients"]]	,silent = TRUE)
-	rg.bur <-
-		try(glm(bur ~ t,family = "poisson")[["coefficients"]]	,silent = TRUE)
-	
-	if (class(rg.inc) == "try-error") rg.inc <- 9E9
-	if (class(rg.bur) == "try-error") rg.bur <- 9E9
-	
+	if (stat.type[["inc.poisson.reg"]]){
+		rg.inc <-
+			try(glm(inc ~ t,family = "poisson")[["coefficients"]]	,silent = TRUE)
+		if (class(rg.inc) == "try-error") rg.inc <- 9E9
+		res <- c(res,rg.inc = rg.inc)
+	}
+	if (stat.type[["bur.poisson.reg"]]){
+		rg.bur <-
+			try(glm(bur ~ t,family = "poisson")[["coefficients"]]	,silent = TRUE)	
+		if (class(rg.bur) == "try-error") rg.bur <- 9E9
+		res <- c(res,rg.bur = rg.bur)
+	}
 	# Maximum and its timing
-	inc.mx <- max(inc)
-	inc.tmx <- t[which.max(inc)]
-	bur.mx <- max(bur)
-	bur.tmx <- t[which.max(bur)]
-	
-	if (do.plot) {
-		plot(t,inc)
-		lines(t,exp(rg.inc[1] + rg.inc[2] * t))
-		plot(t,bur)
-		lines(t,exp(rg.bur[1] + rg.bur[2] * t))
+	if (stat.type[["inc.max"]]){
+		inc.mx <- max(inc)
+		inc.tmx <- t[which.max(inc)]
+		res <- c(res,c(inc.mx = inc.mx,inc.tmx = inc.tmx))
+	}
+	if (stat.type[["bur.max"]]){
+		bur.mx <- max(bur)
+		bur.tmx <- t[which.max(bur)]
+		res <- c(res,c(bur.mx = bur.mx,bur.tmx = bur.tmx))
 	}
 	
-	# Return the stats types requested,
-	res <- vector()
-	
-	if (stat.type[["inc.poisson.reg"]])
-		res <- c(res,rg.inc = rg.inc)
-	if (stat.type[["bur.poisson.reg"]])
-		res <- c(res,rg.bur = rg.bur)
-	if (stat.type[["inc.max"]])
-		res <- c(res,c(inc.mx = inc.mx,inc.tmx = inc.tmx))
-	if (stat.type[["bur.max"]])
-		res <- c(res,c(bur.mx = bur.mx,bur.tmx = bur.tmx))
-	
+	if (do.plot) {
+		if (stat.type[["inc.poisson.reg"]]) {
+			plot(t,inc)
+			lines(t,exp(rg.inc[1] + rg.inc[2] * t))
+		}
+		if (stat.type[["bur.poisson.reg"]]) {
+			plot(t,bur)
+			lines(t,exp(rg.bur[1] + rg.bur[2] * t))
+		}
+	}
 	return(res)
 }
 
@@ -90,33 +93,52 @@ fit.abc <- function(prm.fit,
 					n.MC,  # number of Monte Carlo iterations per sampled parameter set
 					n.ABC, # number of sampled parameter sets
 					tol.ABC,
-					multi.core = 0) {
+					tau.espilon,
+					multi.core = 0,
+					do.plot = FALSE) {
 	# Summary stats of observed data:
 	sum.stat.obs <- NULL
 	if (!is.null(obs.data)) {
 		sum.stat.obs <- abc.stats(sim = obs.data,
 								  prm = prm.stats,
-								  stat.type = stat.type)
+								  stat.type = stat.type,
+								  do.plot = do.plot)
 	}
-	
 	prm.fit.vec <- rapply(prm.fit, c)
 	
-	wrap.abc <- function(x = prm.fit.vec) {
+	wrap.abc <- function(x) {
+		# Initialize random generator:
+		set.seed(x[1])
+		# Get rid of the seed
+		# ("EasyABC" forces the seed to be 
+		# the first parameter of the function)
+		x <- x[2:length(x)]
+		
 		# Merge all model parameters:
-		all.prm <-  as.list(c(prm.fit.vec, prm.fixed))
+		all.prm <-  as.list(c(x, prm.fixed))
+		names(all.prm)[1:length(x)] <- names(prm.fit)
+
 		simul.prm <- list(
 			horizon = horizon,
 			n.MC = n.MC,
 			do.adaptivetau = TRUE,
-			epsilon = 0.05
+			epsilon = tau.espilon
 		)
 		# Simulate:
 		sim <- SEIFR.sim(model.prm = all.prm,
 						 simul.prm = simul.prm)
+		# Take average of all MC iterations:
+		sim.avg <- ddply(sim, .variables = "tb", summarize,
+						 inc = mean(inc),
+						 buried = mean(buried))
 		# Calculate summary stats:
-		sum.stat <- abc.stats(sim = sim,
+		sum.stat <- abc.stats(sim = sim.avg,
 							  prm = prm.stats,
-							  stat.type = stat.type)
+							  stat.type = stat.type, 
+							  do.plot = do.plot)
+		# DEBUG:
+# 		print("currvalue:"); print(x)
+# 		print("currStat:"); print(sum.stat)
 		return(sum.stat)
 	}
 	
@@ -127,7 +149,8 @@ fit.abc <- function(prm.fit,
 	
 	posterior <- ABC_rejection(
 		model = wrap.abc,
-		use_seed = (nc > 1),
+		use_seed = TRUE, #(nc > 1),		
+		# seed_count = 
 		n_cluster = nc,
 		prior = priors,
 		nb_simul = n.ABC,

@@ -91,15 +91,24 @@ forecast.fullreport <- function(obs.data,
 	return(df2)
 }
 
-plot.forecast <- function(x, obs.data) {
+plot.forecast <- function(x, obs.data, obs.data.full=NULL) {
+	
 	plot(x$tb, 
 		 x$inc.m,
 		 ylim = range(obs.data,x$inc.hi,x$inc.lo))
-	
-	points(obs.data$tb,obs.data$inc,
-		   pch=3,col="red")
 	lines(x$tb,x$inc.lo)
 	lines(x$tb,x$inc.hi)
 	
+	
+	if(!is.null(obs.data.full)){
+	   points(obs.data.full$tb,obs.data.full$inc,
+		   pch=3,col="red")
+	}
+	points(obs.data$tb,obs.data$inc,
+		   pch=3,col="red",lwd=5)
+	
+	abline(v=obs.data$tb[length(obs.data$tb)],lty=2)
+	
 }
+
 
