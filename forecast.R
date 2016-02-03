@@ -44,7 +44,7 @@ forecast.fullreport <- function(obs.data,
 	### FORECAST ASSUMING FULL REPORTING
 	### AND SAMPLING FROM POSTERiORS
 	###
-	t1 <- Sys.time()
+	t1 <- as.numeric(Sys.time())
 	# Unpack forecasting parameters:
 	pfcst <- read.csv(prm.fcast.file,header=FALSE)
 	simul.fcast.prm <- list()
@@ -111,8 +111,8 @@ forecast.fullreport <- function(obs.data,
 					 buried.pk=max(buried),
 					 t.buried.pk=tb[which.max(buried)])
 	
-	t2 <- Sys.time()
-	message(paste("\n Forecasting done in",round(as.numeric(t2-t1)/60,2),"minutes"))
+	t2 <- as.numeric(Sys.time())
+	message(paste("\n Forecasting done in",round((t2-t1)/60,2),"minutes"))
 	
 	return(list(df.ensemble = df.ensemble,
 				df.peak = df.peak))
