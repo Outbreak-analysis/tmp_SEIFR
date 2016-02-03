@@ -93,9 +93,17 @@ fit.abc <- function(prm.fit,
 					n.MC,  # number of Monte Carlo iterations per sampled parameter set
 					n.ABC, # number of sampled parameter sets
 					tol.ABC,
-					tau.espilon,
+					tau.epsilon,
 					multi.core = 0,
 					do.plot = FALSE) {
+	###
+	### ABC fit using 'EasyABC' package
+	###
+	
+	# Integrity checks:
+	if (length(prm.fit)!=length(priors)) stop("prm.fit and priors must have the same length")
+	if (floor(tol.ABC*n.ABC)<=2) stop("ABC tolerance or n.ABC is too low")
+	
 	# Summary stats of observed data:
 	sum.stat.obs <- NULL
 	if (!is.null(obs.data)) {
@@ -117,12 +125,12 @@ fit.abc <- function(prm.fit,
 		# Merge all model parameters:
 		all.prm <-  as.list(c(x, prm.fixed))
 		names(all.prm)[1:length(x)] <- names(prm.fit)
-
+		
 		simul.prm <- list(
 			horizon = horizon,
 			n.MC = n.MC,
 			do.adaptivetau = TRUE,
-			epsilon = tau.espilon
+			epsilon = tau.epsilon
 		)
 		# Simulate:
 		sim <- SEIFR.sim(model.prm = all.prm,
@@ -137,8 +145,8 @@ fit.abc <- function(prm.fit,
 							  stat.type = stat.type, 
 							  do.plot = do.plot)
 		# DEBUG:
-# 		print("currvalue:"); print(x)
-# 		print("currStat:"); print(sum.stat)
+		# 		print("currvalue:"); print(x)
+		# 		print("currStat:"); print(sum.stat)
 		return(sum.stat)
 	}
 	
@@ -162,6 +170,60 @@ fit.abc <- function(prm.fit,
 }
 
 
+fit.abc.seifr <- function(obs.data,
+						  prm.fit.file,
+						  prm.model.file,
+						  prm.fit,
+						  priors,
+						  stat.type) {
+	
+	# Fixed parameters (will NOT be calibrated):
+	# (take the original model params and remove the ones that will be)
+	model.prm <- calc.beta(read.param(prm.model.file))
+	prm.fixed  <- model.prm
+	prm.fixed[which(names(prm.fixed) %in% names(prm.fit))] <- NULL  
+	
+	# Read calibration parameters:
+	pf <- read.csv(prm.fit.file,header=FALSE)
+	horizon <- pf[pf[,1]=="horizon",2]  
+	n.MC <- pf[pf[,1]=="n.MC",2]  
+	n.ABC <- pf[pf[,1]=="n.ABC",2]  
+	tol.ABC <- pf[pf[,1]=="tol.ABC",2]  
+	first.time <- pf[pf[,1]=="first.t.stat",2] 
+	tau.epsilon <- pf[pf[,1]=="tau.epsilon",2] 
+	multi.core <- pf[pf[,1]=="multi.core",2] 
+	
+	# Time range where the 
+	# summary stats are aplied:
+	prm.stats <- list(first.time = first.time, 
+					  last.time = max(obs.data$tb))
+	
+	# Calibration with ABC:
+	t1 <- as.numeric(Sys.time())
+	
+	post.abc <- fit.abc(prm.fit, 
+						prm.fixed, 
+						obs.data,
+						prm.stats,
+						stat.type,
+						priors,
+						horizon,  
+						n.MC,
+						n.ABC,
+						tol.ABC,
+						tau.epsilon,
+						multi.core,
+						do.plot = FALSE
+	)
+	
+	t2 <- as.numeric(Sys.time())
+	message(paste0("ABC fit done in ",round((t2-t1)/60,2)," minutes."))
+	
+	save.image("fit_abc_seifr.RData")
+	return(post.abc)
+}
+
+
 post.stat <- function(pp,i,j,CI) {
 	q.lo <- (1-CI)/2
 	q.hi <- 1-q.lo
@@ -173,9 +235,6 @@ post.stat <- function(pp,i,j,CI) {
 	y.hi <- quantile(pp[,j],probs=q.hi)
 	return(list(x.m=x.m,x.lo=x.lo,x.hi=x.hi,y.m=y.m,y.lo=y.lo,y.hi=y.hi))
 }
-
-
-
 
 plot.abcfit <- function(post.abc,prm.fit,priors,true.values=NULL){
 	###
@@ -192,21 +251,21 @@ plot.abcfit <- function(post.abc,prm.fit,priors,true.values=NULL){
 	for (i in 1:np) {
 		for (j in 1:np) {
 			if(j>i){
-			# print(paste(i,j))
-			plot(pp[,i],pp[,j],
-				 xlab = names(prm.fit)[i],
-				 ylab = names(prm.fit)[j],
-				 xlim = as.numeric(as.character(pr[-1,i])), 
-				 ylim = as.numeric(as.character(pr[-1,j])))
-			grid()
-			z <- post.stat(pp,i,j,CI = 0.90)
-			segments(x0 = z[["x.lo"]], x1=z[["x.hi"]], y0=z[["y.m"]], y1=z[["y.m"]])
-			segments(x0 = z[["x.m"]], x1=z[["x.m"]], y0=z[["y.lo"]], y1=z[["y.hi"]])
-			
-			if(!is.null(true.values)){
-				points(true.values[[i]],true.values[[j]],pch=5,col="red",cex=2,lwd=4)
-			}
-			
+				# print(paste(i,j))
+				plot(pp[,i],pp[,j],
+					 xlab = names(prm.fit)[i],
+					 ylab = names(prm.fit)[j],
+					 xlim = as.numeric(as.character(pr[-1,i])), 
+					 ylim = as.numeric(as.character(pr[-1,j])))
+				grid()
+				z <- post.stat(pp,i,j,CI = 0.90)
+				segments(x0 = z[["x.lo"]], x1=z[["x.hi"]], y0=z[["y.m"]], y1=z[["y.m"]])
+				segments(x0 = z[["x.m"]], x1=z[["x.m"]], y0=z[["y.lo"]], y1=z[["y.hi"]])
+				
+				if(!is.null(true.values)){
+					points(true.values[[i]],true.values[[j]],pch=5,col="red",cex=2,lwd=4)
+				}
+				
 			}
 		}
 	}

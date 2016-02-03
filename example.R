@@ -132,19 +132,14 @@ plot.abcfit(post.abc,prm.fit,priors,true.values)
 
 ###   Forecast   ###
 
-pfcst <- read.csv("prm_forecast.csv",header=FALSE)
 
-simul.fcast.prm = simul.prm
-simul.fcast.prm[["horizon"]] <- pfcst[pfcst[,1]=="horizon",2]  
-simul.fcast.prm[["n.MC"]] <- pfcst[pfcst[,1]=="n.MC",2]  
-simul.fcast.prm[["epsilon"]] <- pfcst[pfcst[,1]=="tau.epsilon",2]  
 
 x <- forecast.fullreport(obs.data,
 						 post.abc,
 						 prm.fit,
-						 prm.fixed,
-						 simul.fcast.prm)
-par(mfrow=c(1,1))
+						 prm.model.file = "prm_model.csv",
+						 prm.fcast.file = "prm_forecast.csv")
+
 plot.forecast(x, obs.data,obs.data.full)
 
-message("-END-")
+message("--- END ---")

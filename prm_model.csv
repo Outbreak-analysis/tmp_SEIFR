@@ -4,7 +4,7 @@ funeral.days,1
 delta,0.65
 R0,2.5
 rho,1.0
-pop.size,1000
+pop.size,2000
 nE,3
 nI,4
 nF,2
