@@ -22,8 +22,8 @@ summ.stat.obs <- c(x.true+y.true, x.true*y.true)
 
 
 # ABC parameters:
-n.ABC <- 1000
-tol.ABC <- 0.1  # proportion of best sample retained for posterior distribution
+n.ABC <- 100
+tol.ABC <- 0.1  # proportion of best samples retained for posterior distribution
 
 # number of cores used:
 n_cluster <- 4
@@ -51,7 +51,12 @@ points(x.true,y.true,pch=16,cex=3,col="red")
 # that will be called as the argument 'model' of
 # 'ABC_rejection' to be self-contained (or coded
 # outside R as a binary).
-# That's a problem. 
+
+# That may not be convenient, especially if one
+# already has existing code that needs to be
+# 'plugged' with EsayABC (and you don't want 
+# to rewrite everything)
+
 # If we simply call a function defined outside the 
 # model wrapper, we get an error saying that the function
 # used outside the wrapper is unknown.
@@ -62,7 +67,7 @@ points(x.true,y.true,pch=16,cex=3,col="red")
 # To fix this problem, I "re-source" locally the source code
 # of 'EasyABC' after tweaking it. The hack consists 
 # of including a line that export all functions in
-# the clusters that wil be used for parallel computing.
+# the clusters that will be used for parallel computing.
 # (look for the string "DC HACK"in the locally copied R sources)
 
 
@@ -103,7 +108,7 @@ toy_prior.2 <- list(c("unif",0,1),
 message("starting fit2...")
 
 # Swicth DC's hack on and off:
-do.DC_HACK <- T
+do.DC_HACK <- TRUE
 
 if(do.DC_HACK){
 	library(parallel)
