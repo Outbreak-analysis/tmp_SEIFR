@@ -236,7 +236,7 @@ post.stat <- function(pp,i,j,CI) {
 	return(list(x.m=x.m,x.lo=x.lo,x.hi=x.hi,y.m=y.m,y.lo=y.lo,y.hi=y.hi))
 }
 
-plot.abcfit <- function(post.abc,prm.fit,priors,true.values=NULL){
+plot.abcfit <- function(post.abc,prm.fit,priors,true.values=NULL,location=NULL){
 	###
 	### Plot posterior distributions
 	
@@ -252,7 +252,11 @@ plot.abcfit <- function(post.abc,prm.fit,priors,true.values=NULL){
 		for (j in 1:np) {
 			if(j>i){
 				# print(paste(i,j))
+				title <- "ABC fit results"
+				if(!is.null(location)) title <- paste(title,"\n location",location)
 				plot(pp[,i],pp[,j],
+					 main = title,
+					 cex.main = 0.67,
 					 xlab = names(prm.fit)[i],
 					 ylab = names(prm.fit)[j],
 					 xlim = as.numeric(as.character(pr[-1,i])), 
@@ -272,8 +276,11 @@ plot.abcfit <- function(post.abc,prm.fit,priors,true.values=NULL){
 	
 	par(mfrow=c(snp,snp))
 	for (i in 1:np) {
+		title <- "ABC fit results"
+		if(!is.null(location)) title <- paste(title,"\n location",location)
 		hist(pp[,i],
-			 main="",
+			 main=title,
+			 cex.main = 0.67,
 			 breaks=15,
 			 xlim = as.numeric(as.character(pr[-1,i])), 
 			 xlab = names(prm.fit)[i], 
