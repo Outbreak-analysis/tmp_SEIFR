@@ -294,17 +294,14 @@ SEIFR.sim <-function(model.prm, # List of all model parameters
 
 
 lag.fct <- function(x,lag.mean,lag.var, seed=1234){
-	
+	### INTRODUCE A RANDOM REPORTING LAG
+	###
 	set.seed(seed)
 	
 	x.lag <- rep(0,times=2*length(x))
 	x.lag[1:length(x)] <- x
 	
 	for(t in 1:length(x)){
-		
-# 		print(paste("time",t))
-# 		print(length(x.lag))
-		
 		
 		if(x[t]>0){
 			# If incidence positive, calculate lags for each case at that date:
@@ -387,4 +384,36 @@ reporting.filter <- function(sim,
 		}
 	}
 	return(sim2)
+}
+
+
+delay.epidemic <- function(sim,delay){
+	### DELAY THE START OF AN EPIDEMIC
+	### (USED FOR UNCORRELATED SPATIAL MODEL, TO DELAY SOME LOCATIONS)
+	
+	# 'sim' has several Monte-Carlo realizations,
+	# so must deal with this first before shifting
+	# time forward:
+	
+	if(delay==0) return(sim)
+	
+	x <- list()
+	for(i in unique(sim$mc)){
+		x[[i]] <- subset(sim, mc==i)
+		x[[i]]$tb <- x[[i]]$tb + delay
+		
+		# create an empty data frame
+		# befre the actual epidemic start:
+		tt <- min(x[[i]]$tb)-1
+		z <- x[[i]][1:tt,]
+		z[,2:ncol(z)] <- 0
+		z$tb <- 1:tt
+		z$mc <- i
+		z$loc <- x[[i]]$loc[1]
+		
+		# merge the empty, delayed, start:
+		x[[i]] <- rbind(z,x[[i]])
+	}
+	df <- do.call("rbind",x)
+	return(do.call("rbind",x))
 }

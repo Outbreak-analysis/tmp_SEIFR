@@ -40,6 +40,11 @@ for (i in 1:n.loc) {
 	# Apply reporting layer:
 	sim[[i]] <- reporting.filter(sim.tmp, prm=report.prm)
 	sim[[i]]$loc <- i
+	# Delay in time the epidemic 
+	# for that location:
+	sim[[i]] <- delay.epidemic(sim[[i]], 
+							   delay = model.prm[[i]][["delay"]])
+	
 }
 # merge everything in one data frame:
 allsim <- do.call("rbind",sim)
@@ -87,11 +92,8 @@ plot(g)
 obs.sum <- ddply(all.obs.data.full,c("tb"),summarize,
 				 inc.sum = sum(inc),
 				 bur.sum = sum(buried))
-plot(obs.sum$tb,obs.sum$inc.sum,
-	 typ="s",
-	 main = "Global epidemic \n synthetic data",
-	 xlab="time",ylab="count")
-lines(obs.sum$tb,obs.sum$bur.sum,col="red")
+
+
 
 # Specify which parameters will be calibrated
 # and their prior distributions:
